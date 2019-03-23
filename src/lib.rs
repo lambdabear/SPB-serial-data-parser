@@ -44,6 +44,15 @@ impl SwIn {
     }
 }
 
+impl PartialEq for SwIn {
+    fn eq(&self, other: &SwIn) -> bool {
+        self.in1 == other.in1
+            && self.in2 == other.in2
+            && self.in3 == other.in3
+            && self.ac == other.ac
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SwOut {
     out1: bool,
@@ -67,6 +76,17 @@ impl SwOut {
     }
 }
 
+impl PartialEq for SwOut {
+    fn eq(&self, o: &SwOut) -> bool {
+        self.out1 == o.out1
+            && self.out2 == o.out2
+            && self.out3 == o.out3
+            && self.out4 == o.out4
+            && self.out5 == o.out5
+            && self.out6 == o.out6
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Ups {
     voltage: f32,
@@ -83,6 +103,15 @@ impl Ups {
             power,
             overvoltage,
         }
+    }
+}
+
+impl PartialEq for Ups {
+    fn eq(&self, o: &Ups) -> bool {
+        self.voltage == o.voltage
+            && self.current == o.current
+            && self.power == o.power
+            && self.overvoltage == o.overvoltage
     }
 }
 
@@ -103,6 +132,12 @@ impl Battery {
     }
 }
 
+impl PartialEq for Battery {
+    fn eq(&self, o: &Battery) -> bool {
+        self.voltage == o.voltage && self.current == o.current && self.capacity == o.capacity
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DcOut {
     voltage: f32,
@@ -120,6 +155,12 @@ impl DcOut {
     }
 }
 
+impl PartialEq for DcOut {
+    fn eq(&self, o: &DcOut) -> bool {
+        self.voltage == o.voltage && self.current1 == o.current1 && self.current2 == o.current2
+    }
+}
+
 #[derive(Debug)]
 pub enum SpbState {
     SwIn(SwIn),
@@ -132,29 +173,11 @@ pub enum SpbState {
 impl PartialEq for SpbState {
     fn eq(&self, other: &SpbState) -> bool {
         match (self, other) {
-            (SpbState::SwIn(s), SpbState::SwIn(o)) => {
-                s.in1 == o.in1 && s.in2 == o.in2 && s.in3 == o.in3 && s.ac == o.ac
-            }
-            (SpbState::SwOut(s), SpbState::SwOut(o)) => {
-                s.out1 == o.out1
-                    && s.out2 == o.out2
-                    && s.out3 == o.out3
-                    && s.out4 == o.out4
-                    && s.out5 == s.out5
-                    && s.out6 == o.out6
-            }
-            (SpbState::Ups(s), SpbState::Ups(o)) => {
-                s.voltage == o.voltage
-                    && s.current == o.current
-                    && s.power == o.power
-                    && s.overvoltage == o.overvoltage
-            }
-            (SpbState::Bt(s), SpbState::Bt(o)) => {
-                s.voltage == o.voltage && s.current == o.current && s.capacity == o.capacity
-            }
-            (SpbState::Dc(s), SpbState::Dc(o)) => {
-                s.voltage == o.voltage && s.current1 == o.current1 && s.current2 == o.current2
-            }
+            (SpbState::SwIn(s), SpbState::SwIn(o)) => s == o,
+            (SpbState::SwOut(s), SpbState::SwOut(o)) => s == o,
+            (SpbState::Ups(s), SpbState::Ups(o)) => s == o,
+            (SpbState::Bt(s), SpbState::Bt(o)) => s == o,
+            (SpbState::Dc(s), SpbState::Dc(o)) => s == o,
             _ => false,
         }
     }
