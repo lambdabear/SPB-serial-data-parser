@@ -28,7 +28,9 @@
 /// 对应消息格式："$DC,xx.x,xx.x,xx.x*c\n"
 use std::{error::Error, fmt, str::from_utf8};
 
-#[derive(Debug)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct SwIn {
     in1: bool,
     in2: bool,
@@ -42,7 +44,7 @@ impl SwIn {
     }
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct SwOut {
     out1: bool,
     out2: bool,
@@ -65,7 +67,7 @@ impl SwOut {
     }
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Ups {
     voltage: f32,
     current: f32,
@@ -84,7 +86,7 @@ impl Ups {
     }
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Battery {
     voltage: f32,
     current: f32,
@@ -101,7 +103,7 @@ impl Battery {
     }
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct DcOut {
     voltage: f32,
     current1: f32,
@@ -318,6 +320,16 @@ pub fn parse(data: &[u8]) -> Result<SpbState, Box<dyn Error>> {
             }
         }
         None => Err(Box::new(InvalidDataError {})),
+    }
+}
+
+pub fn to_json(data: SpbState) -> Result<String, serde_json::error::Error> {
+    match data {
+        SpbState::SwIn(data_in) => Ok(serde_json::to_string(&data_in)?),
+        SpbState::SwOut(data_no) => Ok(serde_json::to_string(&data_no)?),
+        SpbState::Ups(data_ups) => Ok(serde_json::to_string(&data_ups)?),
+        SpbState::Bt(data_bt) => Ok(serde_json::to_string(&data_bt)?),
+        SpbState::Dc(data_dc) => Ok(serde_json::to_string(&data_dc)?),
     }
 }
 
