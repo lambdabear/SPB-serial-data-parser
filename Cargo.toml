@@ -1,0 +1,7 @@
+[package]
+name = "spb-serial-data-parser"
+version = "0.1.0"
+authors = ["ZhangYi <zhangyi@goldensecure.com>"]
+edition = "2018"
+
+[dependencies]
