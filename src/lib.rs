@@ -30,7 +30,7 @@ use std::{error::Error, fmt, str::from_utf8};
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SwIn {
     in1: bool,
     in2: bool,
@@ -53,7 +53,7 @@ impl PartialEq for SwIn {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SwOut {
     out1: bool,
     out2: bool,
@@ -87,7 +87,7 @@ impl PartialEq for SwOut {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Ups {
     voltage: f32,
     current: f32,
@@ -115,7 +115,7 @@ impl PartialEq for Ups {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Battery {
     voltage: f32,
     current: f32,
@@ -138,7 +138,7 @@ impl PartialEq for Battery {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct DcOut {
     voltage: f32,
     current1: f32,
