@@ -29,6 +29,7 @@
 use std::{error::Error, fmt, str::from_utf8};
 
 use serde::{Deserialize, Serialize};
+use serde_json::to_string;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SwIn {
@@ -168,6 +169,18 @@ pub enum SpbState {
     Ups(Ups),
     Bt(Battery),
     Dc(DcOut),
+}
+
+impl SpbState {
+    pub fn to_json_string(&self) -> Result<String, serde_json::error::Error> {
+        match self {
+            SpbState::SwIn(swin) => to_string(&swin),
+            SpbState::SwOut(swout) => to_string(&swout),
+            SpbState::Ups(ups) => to_string(ups),
+            SpbState::Bt(bt) => to_string(bt),
+            SpbState::Dc(dc) => to_string(dc),
+        }
+    }
 }
 
 impl PartialEq for SpbState {
