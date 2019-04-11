@@ -162,7 +162,7 @@ impl PartialEq for DcOut {
     }
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum SpbState {
     SwIn(SwIn),
     SwOut(SwOut),
@@ -356,16 +356,6 @@ pub fn parse(data: &[u8]) -> Result<SpbState, Box<dyn Error>> {
             }
         }
         None => Err(Box::new(InvalidDataError {})),
-    }
-}
-
-pub fn to_json(data: SpbState) -> Result<String, serde_json::error::Error> {
-    match data {
-        SpbState::SwIn(data_in) => Ok(serde_json::to_string(&data_in)?),
-        SpbState::SwOut(data_no) => Ok(serde_json::to_string(&data_no)?),
-        SpbState::Ups(data_ups) => Ok(serde_json::to_string(&data_ups)?),
-        SpbState::Bt(data_bt) => Ok(serde_json::to_string(&data_bt)?),
-        SpbState::Dc(data_dc) => Ok(serde_json::to_string(&data_dc)?),
     }
 }
 
