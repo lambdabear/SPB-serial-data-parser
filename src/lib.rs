@@ -33,10 +33,10 @@ use serde_json::to_string;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SwIn {
-    in1: bool,
-    in2: bool,
-    in3: bool,
-    ac: bool,
+    pub in1: bool,
+    pub in2: bool,
+    pub in3: bool,
+    pub ac: bool,
 }
 
 impl SwIn {
@@ -56,12 +56,12 @@ impl PartialEq for SwIn {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SwOut {
-    out1: bool,
-    out2: bool,
-    out3: bool,
-    out4: bool,
-    out5: bool,
-    out6: bool,
+    pub out1: bool,
+    pub out2: bool,
+    pub out3: bool,
+    pub out4: bool,
+    pub out5: bool,
+    pub out6: bool,
 }
 
 impl SwOut {
@@ -90,10 +90,10 @@ impl PartialEq for SwOut {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Ups {
-    voltage: f32,
-    current: f32,
-    power: f32,
-    overvoltage: bool,
+    pub voltage: f32,
+    pub current: f32,
+    pub power: f32,
+    pub overvoltage: bool,
 }
 
 impl Ups {
@@ -118,13 +118,13 @@ impl PartialEq for Ups {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Battery {
-    voltage: f32,
-    current: f32,
-    capacity: u8,
+    pub voltage: f32,
+    pub current: f32,
+    pub capacity: f32,
 }
 
 impl Battery {
-    pub fn new(voltage: f32, current: f32, capacity: u8) -> Battery {
+    pub fn new(voltage: f32, current: f32, capacity: f32) -> Battery {
         Battery {
             voltage,
             current,
@@ -141,9 +141,9 @@ impl PartialEq for Battery {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct DcOut {
-    voltage: f32,
-    current1: f32,
-    current2: f32,
+    pub voltage: f32,
+    pub current1: f32,
+    pub current2: f32,
 }
 
 impl DcOut {
@@ -317,7 +317,7 @@ pub fn parse(data: &[u8]) -> Result<SpbState, Box<dyn Error>> {
                         }
                         "BT" => {
                             let mut args1: Vec<f32> = vec![];
-                            let mut args2: Vec<u8> = vec![];
+                            let mut args2: Vec<f32> = vec![];
                             for (i, x) in iter.enumerate() {
                                 match i {
                                     0...1 => {
@@ -325,7 +325,7 @@ pub fn parse(data: &[u8]) -> Result<SpbState, Box<dyn Error>> {
                                         args1.push(t);
                                     }
                                     2 => {
-                                        let t = from_utf8(x)?.parse::<u8>()?;
+                                        let t = from_utf8(x)?.parse::<f32>()?;
                                         args2.push(t)
                                     }
                                     _ => (),
@@ -475,7 +475,7 @@ mod tests {
                     == SpbState::Bt(Battery {
                         voltage: 12.3,
                         current: 5.6,
-                        capacity: 46,
+                        capacity: 46.0,
                     })
             }
             Err(_) => false,
