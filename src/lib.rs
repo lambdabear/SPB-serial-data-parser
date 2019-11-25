@@ -26,6 +26,21 @@
 ///   "DC V:xx.xV;DC1 I:xx.xA;DC2 I:xx.xA;\n"
 /// 说明：分别对应输出电压，输出1电流，输出2电流
 /// 对应消息格式："$DC,xx.x,xx.x,xx.x*c\n"
+/// (6)输出交流状态：
+///   "AC V:xxxV; AC I:xx.xA;"
+/// 说明：分别对应交流输出电压，电流。
+/// 对应消息格式："$AC,xxx,xx.x*c\n"
+/// 3.控制命令，向控制板发送命令：
+/// (1)开/关交流输出：
+///   "CMD AC:x;"
+/// 说明：控制交流输出，'x'为开关量，'1'为开，'0'为关。
+/// 对应消息格式："$CMD,ac,x*c\n"
+/// 控制板执行成功后立即返回交流状态作为回应（格式为本协议第2部分(6)）
+/// (2)开/关直流输出（两路）：
+///   "CMD DC1:x;" 或 "CMD DC2:x;"
+/// 说明：控制直流输出，'x'为开关量，'1'为开，'0'为关。
+/// 对应消息格式："$CMD,dc1,x*c\n" 或 "$CMD,dc2,x*c\n"
+/// 控制板执行成功后立即返回直流状态作为回应（格式为本协议第2部分(5)）
 use std::{error::Error, fmt, str::from_utf8};
 
 use serde::{Deserialize, Serialize};
@@ -163,12 +178,34 @@ impl PartialEq for DcOut {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct AcOut {
+    pub voltage: u32,
+    pub current: f32,
+}
+
+impl AcOut {
+    pub fn new(v: u32, c: f32) -> AcOut {
+        AcOut {
+            voltage: v,
+            current: c,
+        }
+    }
+}
+
+impl PartialEq for AcOut {
+    fn eq(&self, o: &AcOut) -> bool {
+        self.voltage == o.voltage && self.current == o.current
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum SpbState {
     SwIn(SwIn),
     SwOut(SwOut),
     Ups(Ups),
     Bt(Battery),
     Dc(DcOut),
+    Ac(AcOut),
 }
 
 impl SpbState {
@@ -179,6 +216,7 @@ impl SpbState {
             SpbState::Ups(ups) => to_string(ups),
             SpbState::Bt(bt) => to_string(bt),
             SpbState::Dc(dc) => to_string(dc),
+            SpbState::Ac(ac) => to_string(ac),
         }
     }
 }
@@ -191,6 +229,7 @@ impl PartialEq for SpbState {
             (SpbState::Ups(s), SpbState::Ups(o)) => s == o,
             (SpbState::Bt(s), SpbState::Bt(o)) => s == o,
             (SpbState::Dc(s), SpbState::Dc(o)) => s == o,
+            (SpbState::Ac(s), SpbState::Ac(o)) => s == o,
             _ => false,
         }
     }
@@ -295,7 +334,7 @@ pub fn parse(data: &[u8]) -> Result<SpbState, Box<dyn Error>> {
                             let mut args2: Vec<bool> = vec![];
                             for (i, x) in iter.enumerate() {
                                 match i {
-                                    0...2 => {
+                                    0..=2 => {
                                         let t = from_utf8(x)?.parse::<f32>()?;
                                         args1.push(t);
                                     }
@@ -320,7 +359,7 @@ pub fn parse(data: &[u8]) -> Result<SpbState, Box<dyn Error>> {
                             let mut args2: Vec<f32> = vec![];
                             for (i, x) in iter.enumerate() {
                                 match i {
-                                    0...1 => {
+                                    0..=1 => {
                                         let t = from_utf8(x)?.parse::<f32>()?;
                                         args1.push(t);
                                     }
@@ -346,6 +385,27 @@ pub fn parse(data: &[u8]) -> Result<SpbState, Box<dyn Error>> {
                             }
                             match args.len() {
                                 3 => Ok(SpbState::Dc(DcOut::new(args[0], args[1], args[2]))),
+                                _ => Err(Box::new(InvalidDataError)),
+                            }
+                        }
+                        "AC" => {
+                            let mut args1: Vec<u32> = vec![];
+                            let mut args2: Vec<f32> = vec![];
+                            for (i, x) in iter.enumerate() {
+                                match i {
+                                    0 => {
+                                        let t = from_utf8(x)?.parse::<u32>()?;
+                                        args1.push(t);
+                                    }
+                                    1 => {
+                                        let t = from_utf8(x)?.parse::<f32>()?;
+                                        args2.push(t);
+                                    }
+                                    _ => (),
+                                }
+                            }
+                            match (args1.len(), args2.len()) {
+                                (1, 1) => Ok(SpbState::Ac(AcOut::new(args1[0], args2[0]))),
                                 _ => Err(Box::new(InvalidDataError)),
                             }
                         }
@@ -388,6 +448,28 @@ pub fn extract_msg<'a, 'b>(buffer: &'a [u8], msg_cache: &'b mut Vec<u8>) -> Opti
         Some(&msg_cache[..])
     } else {
         None
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Cmd {
+    output: String, // "ac", "dc1", "dc2"
+    switch: u8,     // 0, 1
+}
+
+impl Cmd {
+    pub fn encode(&self) -> Result<String, ()> {
+        if self.switch > 1 {
+            return Err(());
+        }
+        if self.output == "ac" || self.output == "dc1" || self.output == "dc2" {
+            let cmd = format!("CMD,{},{}", self.output, self.switch);
+            Ok(format!("${}*{:02X}\n", cmd, {
+                cmd.clone().into_bytes().iter().fold(0, |acc, x| acc ^ x)
+            }))
+        } else {
+            return Err(());
+        }
     }
 }
 
@@ -435,7 +517,7 @@ mod tests {
                         in1: true,
                         in2: false,
                         in3: true,
-                        ac: true
+                        ac: true,
                     })
             }
             Err(_) => false,
@@ -520,5 +602,65 @@ mod tests {
 
         buffer = String::from(",1,1*06\n").into_bytes();
         assert_eq!(None, extract_msg(&buffer, &mut cache));
+    }
+
+    #[test]
+    fn test_encode() {
+        let cmd = Cmd {
+            output: "ac".to_string(),
+            switch: 0,
+        };
+        assert_eq!(
+            cmd.encode().expect("encode failed"),
+            format!("$CMD,ac,0*{:02X}\n", {
+                "CMD,ac,0"
+                    .to_string()
+                    .into_bytes()
+                    .iter()
+                    .fold(0, |acc, x| acc ^ x)
+            })
+        );
+
+        let cmd = Cmd {
+            output: "dc1".to_string(),
+            switch: 1,
+        };
+        assert_eq!(
+            cmd.encode().expect("encode failed"),
+            format!("$CMD,dc1,1*{:02X}\n", {
+                "CMD,dc1,1"
+                    .to_string()
+                    .into_bytes()
+                    .iter()
+                    .fold(0, |acc, x| acc ^ x)
+            })
+        );
+
+        let cmd = Cmd {
+            output: "dc2".to_string(),
+            switch: 0,
+        };
+        assert_eq!(
+            cmd.encode().expect("encode failed"),
+            format!("$CMD,dc2,0*{:02X}\n", {
+                "CMD,dc2,0"
+                    .to_string()
+                    .into_bytes()
+                    .iter()
+                    .fold(0, |acc, x| acc ^ x)
+            })
+        );
+
+        let cmd = Cmd {
+            output: "mc".to_string(),
+            switch: 0,
+        };
+        assert_eq!(cmd.encode(), Err(()));
+
+        let cmd = Cmd {
+            output: "ac".to_string(),
+            switch: 3,
+        };
+        assert_eq!(cmd.encode(), Err(()));
     }
 }
