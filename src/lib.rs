@@ -458,6 +458,15 @@ pub struct Cmd {
 }
 
 impl Cmd {
+    pub fn new(output: String, switch: u8) -> Result<Self, ()> {
+        if output == "ac" || output == "dc1" || output == "dc2" {
+            if switch == 0 || switch == 1 {
+                return Ok(Cmd { output, switch });
+            }
+        }
+        Err(())
+    }
+
     pub fn encode(&self) -> Result<String, ()> {
         if self.switch > 1 {
             return Err(());
