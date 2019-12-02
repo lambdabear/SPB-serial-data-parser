@@ -23,13 +23,13 @@
 /// 说明：分别对应电池电压，电流，容量百分比。
 /// 对应消息格式："$BT,xx.x,xx.x,xx*c\n"
 /// (5)输出直流状态：
-///   "DC V:xx.xV;DC1 I:xx.xA;DC2 I:xx.xA;\n"
+///   "DC V:xx.xV;DC1 I:xx.xA;DC1 SW:x;DC2 I:xx.xA; DC2 SW:x;"
 /// 说明：分别对应输出电压，输出1电流，输出2电流
-/// 对应消息格式："$DC,xx.x,xx.x,xx.x*c\n"
+/// 对应消息格式："$DC,xx.x,xx.x,x,xx.x,x*c\n"
 /// (6)输出交流状态：
-///   "AC V:xxxV; AC I:xx.xA;"
+///   "AC V:xxxV;AC I:xx.xA;AC SW:x;"
 /// 说明：分别对应交流输出电压，电流。
-/// 对应消息格式："$AC,xxx,xx.x*c\n"
+/// 对应消息格式："$AC,xxx,xx.x,x*c\n"
 /// 3.控制命令，向控制板发送命令：
 /// (1)开/关交流输出：
 ///   "CMD AC:x;"
@@ -158,22 +158,30 @@ impl PartialEq for Battery {
 pub struct DcOut {
     pub voltage: f32,
     pub current1: f32,
+    pub switch1: bool,
     pub current2: f32,
+    pub switch2: bool,
 }
 
 impl DcOut {
-    pub fn new(v: f32, c1: f32, c2: f32) -> DcOut {
+    pub fn new(v: f32, c1: f32, sw1: bool, c2: f32, sw2: bool) -> DcOut {
         DcOut {
             voltage: v,
             current1: c1,
+            switch1: sw1,
             current2: c2,
+            switch2: sw2,
         }
     }
 }
 
 impl PartialEq for DcOut {
     fn eq(&self, o: &DcOut) -> bool {
-        self.voltage == o.voltage && self.current1 == o.current1 && self.current2 == o.current2
+        self.voltage == o.voltage
+            && self.current1 == o.current1
+            && self.current2 == o.current2
+            && self.switch1 == o.switch1
+            && self.switch2 == o.switch2
     }
 }
 
@@ -181,20 +189,22 @@ impl PartialEq for DcOut {
 pub struct AcOut {
     pub voltage: u32,
     pub current: f32,
+    pub switch: bool,
 }
 
 impl AcOut {
-    pub fn new(v: u32, c: f32) -> AcOut {
+    pub fn new(v: u32, c: f32, sw: bool) -> AcOut {
         AcOut {
             voltage: v,
             current: c,
+            switch: sw,
         }
     }
 }
 
 impl PartialEq for AcOut {
     fn eq(&self, o: &AcOut) -> bool {
-        self.voltage == o.voltage && self.current == o.current
+        self.voltage == o.voltage && self.current == o.current && self.switch == o.switch
     }
 }
 
@@ -378,19 +388,32 @@ pub fn parse(data: &[u8]) -> Result<SpbState, Box<dyn Error>> {
                             }
                         }
                         "DC" => {
-                            let mut args: Vec<f32> = vec![];
-                            for x in iter {
-                                let t = from_utf8(x)?.parse::<f32>()?;
-                                args.push(t);
+                            let mut args1: Vec<f32> = vec![];
+                            let mut args2: Vec<bool> = vec![];
+                            for (i, x) in iter.enumerate() {
+                                if i == 2 || i == 4 {
+                                    let t = from_utf8(x)?.parse::<u8>()?;
+                                    match t {
+                                        0 => args2.push(false),
+                                        1 => args2.push(true),
+                                        _ => (),
+                                    }
+                                } else {
+                                    let t = from_utf8(x)?.parse::<f32>()?;
+                                    args1.push(t);
+                                }
                             }
-                            match args.len() {
-                                3 => Ok(SpbState::Dc(DcOut::new(args[0], args[1], args[2]))),
+                            match (args1.len(), args2.len()) {
+                                (3, 2) => Ok(SpbState::Dc(DcOut::new(
+                                    args1[0], args1[1], args2[0], args1[2], args2[1],
+                                ))),
                                 _ => Err(Box::new(InvalidDataError)),
                             }
                         }
                         "AC" => {
                             let mut args1: Vec<u32> = vec![];
                             let mut args2: Vec<f32> = vec![];
+                            let mut sw: Vec<bool> = vec![];
                             for (i, x) in iter.enumerate() {
                                 match i {
                                     0 => {
@@ -401,11 +424,21 @@ pub fn parse(data: &[u8]) -> Result<SpbState, Box<dyn Error>> {
                                         let t = from_utf8(x)?.parse::<f32>()?;
                                         args2.push(t);
                                     }
+                                    2 => {
+                                        let t = from_utf8(x)?.parse::<u8>()?;
+                                        match t {
+                                            0 => sw.push(false),
+                                            1 => sw.push(true),
+                                            _ => (),
+                                        }
+                                    }
                                     _ => (),
                                 }
                             }
-                            match (args1.len(), args2.len()) {
-                                (1, 1) => Ok(SpbState::Ac(AcOut::new(args1[0], args2[0]))),
+                            match (args1.len(), args2.len(), sw.len()) {
+                                (1, 1, 1) => {
+                                    Ok(SpbState::Ac(AcOut::new(args1[0], args2[0], sw[0])))
+                                }
                                 _ => Err(Box::new(InvalidDataError)),
                             }
                         }
@@ -512,8 +545,14 @@ mod tests {
                 .iter()
                 .fold(0, |acc, x| acc ^ x)
         });
-        let data_dc = format!("$DC,11.9,5.4,1.2*{:02X}\n", {
-            String::from("DC,11.9,5.4,1.2")
+        let data_dc = format!("$DC,11.9,5.4,0,1.2,1*{:02X}\n", {
+            String::from("DC,11.9,5.4,0,1.2,1")
+                .into_bytes()
+                .iter()
+                .fold(0, |acc, x| acc ^ x)
+        });
+        let data_ac = format!("$AC,230,2.2,1*{:02X}\n", {
+            String::from("AC,230,2.2,1")
                 .into_bytes()
                 .iter()
                 .fold(0, |acc, x| acc ^ x)
@@ -578,7 +617,21 @@ mod tests {
                     == SpbState::Dc(DcOut {
                         voltage: 11.9,
                         current1: 5.4,
+                        switch1: false,
                         current2: 1.2,
+                        switch2: true,
+                    })
+            }
+            Err(_) => false,
+        });
+        print!("AC: {}", data_ac);
+        assert!(match parse(&String::into_bytes(data_ac)) {
+            Ok(data_in) => {
+                data_in
+                    == SpbState::Ac(AcOut {
+                        voltage: 230,
+                        current: 2.2,
+                        switch: true,
                     })
             }
             Err(_) => false,
