@@ -487,25 +487,20 @@ pub fn extract_msg<'a, 'b>(buffer: &'a [u8], msg_cache: &'b mut Vec<u8>) -> Opti
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Cmd {
     output: String, // "ac", "dc1", "dc2"
-    switch: u8,     // 0, 1
+    switch: bool,
 }
 
 impl Cmd {
-    pub fn new(output: String, switch: u8) -> Result<Self, ()> {
+    pub fn new(output: String, switch: bool) -> Result<Self, ()> {
         if output == "ac" || output == "dc1" || output == "dc2" {
-            if switch == 0 || switch == 1 {
-                return Ok(Cmd { output, switch });
-            }
+            return Ok(Cmd { output, switch });
         }
         Err(())
     }
 
     pub fn encode(&self) -> Result<String, ()> {
-        if self.switch > 1 {
-            return Err(());
-        }
         if self.output == "ac" || self.output == "dc1" || self.output == "dc2" {
-            let cmd = format!("CMD,{},{}", self.output, self.switch);
+            let cmd = format!("CMD,{},{}", self.output, if self.switch { 1 } else { 0 });
             Ok(format!("${}*{:02X}\n", cmd, {
                 cmd.clone().into_bytes().iter().fold(0, |acc, x| acc ^ x)
             }))
@@ -670,7 +665,7 @@ mod tests {
     fn test_encode() {
         let cmd = Cmd {
             output: "ac".to_string(),
-            switch: 0,
+            switch: false,
         };
         assert_eq!(
             cmd.encode().expect("encode failed"),
@@ -685,7 +680,7 @@ mod tests {
 
         let cmd = Cmd {
             output: "dc1".to_string(),
-            switch: 1,
+            switch: true,
         };
         assert_eq!(
             cmd.encode().expect("encode failed"),
@@ -700,7 +695,7 @@ mod tests {
 
         let cmd = Cmd {
             output: "dc2".to_string(),
-            switch: 0,
+            switch: false,
         };
         assert_eq!(
             cmd.encode().expect("encode failed"),
@@ -715,13 +710,7 @@ mod tests {
 
         let cmd = Cmd {
             output: "mc".to_string(),
-            switch: 0,
-        };
-        assert_eq!(cmd.encode(), Err(()));
-
-        let cmd = Cmd {
-            output: "ac".to_string(),
-            switch: 3,
+            switch: false,
         };
         assert_eq!(cmd.encode(), Err(()));
     }
